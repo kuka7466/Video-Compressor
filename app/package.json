@@ -1,0 +1,17 @@
+{
+  "name": "ffmpeg-video-converter",
+  "version": "1.0.0",
+  "description": "Premium FFmpeg Video Converter & Compressor",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^9.0.1"
+  }
+}

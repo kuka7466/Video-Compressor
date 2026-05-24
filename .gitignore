@@ -1,0 +1,26 @@
+# Ignore local pre-compiled FFmpeg distribution folders (heavy binaries)
+/bin/
+/doc/
+/presets/
+/LICENSE
+/README.txt
+
+# Ignore screenshots
+/screenshot.png
+/screenshot_updated.png
+
+# Ignore node modules inside app
+/app/node_modules/
+
+# Ignore temporary upload/compressed files but preserve directories via gitkeep
+/app/uploads/*
+!/app/uploads/.gitkeep
+/app/converted/*
+!/app/converted/.gitkeep
+
+# Ignore environment variables & system logs
+.env
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

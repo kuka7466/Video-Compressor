@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AeroCompress | High-End Video Converter & Compressor</title>
+  <meta name="description" content="Ultra-fast, premium web-based video compressor and converter powered by FFmpeg. Compress your videos in visually lossless quality.">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="glow-container">
+    <div class="glow-sphere sphere-1"></div>
+    <div class="glow-sphere sphere-2"></div>
+  </div>
+
+  <main class="app-container">
+    <header class="app-header">
+      <div class="logo">
+        <span class="logo-icon">▲</span>
+        <span class="logo-text">AERO<span>COMPRESS</span></span>
+      </div>
+      <p class="subtitle">Visually Lossless Video Compression & Multi-Format Conversion</p>
+      <div class="header-actions">
+        <button id="clear-temp-btn" class="btn btn-secondary btn-sm">
+          <span>🧹 Clear Temp Cache</span>
+        </button>
+        <button id="shutdown-server-btn" class="btn btn-danger btn-sm">
+          <span>🛑 Shutdown Server</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- STEP 1: Upload Workspace -->
+    <section id="upload-section" class="card fade-in">
+      <div id="drop-zone" class="drop-zone">
+        <input type="file" id="file-input" accept="video/*" hidden>
+        <div class="drop-zone-content">
+          <div class="upload-icon-wrapper">
+            <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+          </div>
+          <h3>Drag & drop video here</h3>
+          <p>or <span class="browse-btn">browse files</span></p>
+          <span class="file-limits">Supports MP4, MOV, MKV, AVI, WebM up to 500MB</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2: Configure Workspace -->
+    <section id="config-section" class="card hidden">
+      <div class="card-header">
+        <h2>Configure Conversion Settings</h2>
+        <button id="change-file-btn" class="btn btn-secondary btn-sm">Change Video</button>
+      </div>
+
+      <!-- File details panel -->
+      <div class="file-details">
+        <div class="detail-item">
+          <span class="detail-label">File Name</span>
+          <span id="meta-name" class="detail-value">video.mp4</span>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">File Size</span>
+            <span id="meta-size" class="detail-value">0 MB</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Duration</span>
+            <span id="meta-duration" class="detail-value">0s</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Resolution</span>
+            <span id="meta-resolution" class="detail-value">Original</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">FPS</span>
+            <span id="meta-fps" class="detail-value">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Options Form -->
+      <div class="options-container">
+        <!-- Option Block: Format -->
+        <div class="option-group">
+          <label for="target-format">Target Format</label>
+          <div class="select-wrapper">
+            <select id="target-format">
+              <option value="mp4" selected>MP4 (H.264 - Highly Compatible)</option>
+              <option value="mkv">MKV (H.265/HEVC - Maximum Efficiency)</option>
+              <option value="webm">WebM (VP9 - Perfect for Web)</option>
+              <option value="mp3">MP3 (Audio Only Extraction)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Option Block: Compression Mode -->
+        <div class="option-group" id="compression-group">
+          <label>Compression & Quality Level</label>
+          <div class="radio-cards">
+            <label class="radio-card active">
+              <input type="radio" name="compression-mode" value="balanced" checked>
+              <div class="radio-content">
+                <span class="radio-title">Balanced</span>
+                <span class="radio-desc">Best trade-off between file size and quality.</span>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="compression-mode" value="high">
+              <div class="radio-content">
+                <span class="radio-title">High Quality</span>
+                <span class="radio-desc">Visually lossless compression. Minimal size reduction.</span>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="compression-mode" value="max">
+              <div class="radio-content">
+                <span class="radio-title">Max Compression</span>
+                <span class="radio-desc">Smallest file size. Some reduction in quality.</span>
+              </div>
+            </label>
+            <label class="radio-card" id="custom-radio-card">
+              <input type="radio" name="compression-mode" value="custom">
+              <div class="radio-content">
+                <span class="radio-title">Custom Bitrate</span>
+                <span class="radio-desc">Specify output video bitrate manually.</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Custom Bitrate Input (Conditional) -->
+        <div class="option-group hidden" id="custom-bitrate-container">
+          <label for="custom-bitrate">Video Bitrate (kbps)</label>
+          <div class="input-wrapper">
+            <input type="number" id="custom-bitrate" placeholder="e.g. 1500" min="100" max="20000">
+            <span class="input-suffix">kbps</span>
+          </div>
+        </div>
+
+        <div class="options-row" id="video-options-row">
+          <!-- Option Block: Resolution Scale -->
+          <div class="option-group half-width">
+            <label for="resolution-scale">Resolution Scale</label>
+            <div class="select-wrapper">
+              <select id="resolution-scale">
+                <option value="original" selected>Keep Original Size</option>
+                <option value="1080p">Scale to 1080p (Full HD)</option>
+                <option value="720p">Scale to 720p (HD)</option>
+                <option value="480p">Scale to 480p (SD)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Option Block: Audio options -->
+          <div class="option-group half-width">
+            <label for="audio-option">Audio Options</label>
+            <div class="select-wrapper">
+              <select id="audio-option">
+                <option value="keep" selected>Keep Audio Track</option>
+                <option value="mute">Mute Video (No Audio)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Option Block: Custom Save Location -->
+        <div class="option-group">
+          <label for="custom-save-path">Direct Export Directory (Optional)</label>
+          <div class="input-wrapper">
+            <input type="text" id="custom-save-path" placeholder="e.g. C:\Users\Kashu\Desktop">
+          </div>
+          <span class="file-limits">If specified, the file will be saved directly to this local path on your computer.</span>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <button id="start-btn" class="btn btn-primary btn-block">
+          <span>Start Compression</span>
+          <svg class="btn-arrow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- STEP 3: Progress and Running Compression -->
+    <section id="processing-section" class="card hidden">
+      <div class="processing-header">
+        <div class="spinner-glow">
+          <div class="spinner"></div>
+        </div>
+        <h2 id="status-title">Compressing Video...</h2>
+        <p id="status-subtitle">Preparing files and spawning FFmpeg pipeline</p>
+      </div>
+
+      <div class="progress-container">
+        <!-- SVG Radial Progress -->
+        <div class="radial-progress-wrapper">
+          <svg class="radial-svg" viewBox="0 0 100 100">
+            <circle class="radial-bg" cx="50" cy="50" r="45"></circle>
+            <circle id="radial-bar" class="radial-bar" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="283"></circle>
+          </svg>
+          <div class="radial-text">
+            <span id="progress-percentage" class="percentage">0%</span>
+            <span class="label">Completed</span>
+          </div>
+        </div>
+
+        <div class="progress-stats-grid">
+          <div class="stat-box">
+            <span class="stat-label">Encoding Speed</span>
+            <span id="stat-speed" class="stat-value">0.00x</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Frame Rate</span>
+            <span id="stat-fps" class="stat-value">0 fps</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Time Remaining</span>
+            <span id="stat-eta" class="stat-value">calculating...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Realtime terminal logs -->
+      <div class="terminal-log">
+        <div class="terminal-header">
+          <span class="terminal-dot red"></span>
+          <span class="terminal-dot yellow"></span>
+          <span class="terminal-dot green"></span>
+          <span class="terminal-title">FFmpeg Console Logs</span>
+        </div>
+        <div id="terminal-content" class="terminal-content">
+          <div class="log-line system">[system] Readying processing workers...</div>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <button id="cancel-btn" class="btn btn-danger btn-block">Cancel Processing</button>
+      </div>
+    </section>
+
+    <!-- STEP 4: Download and Compare -->
+    <section id="result-section" class="card hidden">
+      <div class="result-celebration">
+        <div class="success-icon-wrapper">
+          <svg class="success-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h2>Compression Completed!</h2>
+        <p>Your video was processed in record time. Check the statistics below.</p>
+      </div>
+
+      <!-- Size savings panel -->
+      <div class="savings-card">
+        <div class="savings-badge-wrapper">
+          <span id="savings-badge" class="savings-badge">-65%</span>
+          <span class="badge-label">Size Reduction</span>
+        </div>
+        <div class="savings-bar-container">
+          <div class="savings-bar-labels">
+            <span>Original Size: <strong id="size-before">120 MB</strong></span>
+            <span>New Size: <strong id="size-after">42 MB</strong></span>
+          </div>
+          <div class="savings-bar-track">
+            <div id="savings-bar-fill" class="savings-bar-fill" style="width: 35%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-details">
+        <div class="detail-item">
+          <span class="detail-label">Output Filename</span>
+          <span id="result-filename" class="detail-value">video_compressed.mp4</span>
+        </div>
+      </div>
+
+      <div class="action-bar gap-layout">
+        <a id="download-btn" href="#" class="btn btn-primary btn-glow btn-block" download>
+          <span>Download Video</span>
+          <svg class="download-arrow" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+        </a>
+        <button id="reset-btn" class="btn btn-secondary btn-block">Process Another Video</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>Powered by Node.js & FFmpeg WebAssembly-free Server Pipeline</p>
+  </footer>
+
+  <!-- Shutdown Modal Overlay -->
+  <div id="shutdown-overlay" class="hidden">
+    <div class="shutdown-content">
+      <div class="shutdown-icon">⚡</div>
+      <h2>Server Shut Down</h2>
+      <p>The AeroCompress Node.js backend pipeline has been terminated cleanly.</p>
+      <p class="shutdown-subtext">You can now safely close this browser window or tab.</p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
