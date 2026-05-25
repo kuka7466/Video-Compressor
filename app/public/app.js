@@ -293,15 +293,12 @@ startBtn.addEventListener('click', async () => {
     return;
   }
 
-  const customSavePath = document.getElementById('custom-save-path').value.trim();
-
   const payload = {
     targetFormat: targetFormat.value,
     compressionMode: compressionMode,
     resolutionScale: resolutionScale.value,
     audioOption: audioOption.value,
-    customBitrate: compressionMode === 'custom' ? parseInt(customBitrate, 10) : null,
-    customSavePath: customSavePath || null
+    customBitrate: compressionMode === 'custom' ? parseInt(customBitrate, 10) : null
   };
 
   try {
@@ -492,28 +489,4 @@ clearTempBtn.addEventListener('click', async () => {
   }
 });
 
-// 8. Shut Down Server API Connection
-shutdownServerBtn.addEventListener('click', async () => {
-  if (!confirm('Are you sure you want to shut down the AeroCompress server? This will terminate the Node.js process and release port 3000.')) {
-    return;
-  }
-  
-  shutdownServerBtn.disabled = true;
-  shutdownServerBtn.innerHTML = '<span>🛑 Shutting down...</span>';
-  
-  try {
-    const res = await fetch('/api/shutdown', { method: 'POST' });
-    if (res.status === 200) {
-      shutdownOverlay.classList.remove('hidden');
-    } else {
-      alert('Failed to shut down server.');
-      shutdownServerBtn.disabled = false;
-      shutdownServerBtn.innerHTML = '<span>🛑 Shutdown Server</span>';
-    }
-  } catch(err) {
-    // If the server drops the socket immediately upon shutdown, it's successful!
-    shutdownOverlay.classList.remove('hidden');
-  }
-});
-
-
+// 8. Shut Down Server API Connection - REMOVED DUE TO DOS VULNERABILITY

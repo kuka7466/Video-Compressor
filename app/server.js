@@ -92,12 +92,13 @@ setInterval(() => {
 // Fetch video metadata using FFprobe
 function getVideoMetadata(filePath) {
   return new Promise((resolve, reject) => {
-    const cmd = `"${FFPROBE_PATH}" -v error -select_streams v:0 -show_entries stream=width,height,duration,r_frame_rate -show_entries format=size,duration,bit_rate -of json "${filePath}"`;
-    exec(cmd, (error, stdout, stderr) => {
+    const { execFile } = require('child_process');
+    const args = ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height,duration,r_frame_rate', '-show_entries', 'format=size,duration,bit_rate', '-of', 'json', filePath];
+    execFile(FFPROBE_PATH, args, (error, stdout, stderr) => {
       if (error) {
         // Fallback for audio-only or unsupported video structures
-        const fallbackCmd = `"${FFPROBE_PATH}" -v error -show_entries format=size,duration,bit_rate -of json "${filePath}"`;
-        exec(fallbackCmd, (fallbackError, fallbackStdout) => {
+        const fallbackArgs = ['-v', 'error', '-show_entries', 'format=size,duration,bit_rate', '-of', 'json', filePath];
+        execFile(FFPROBE_PATH, fallbackArgs, (fallbackError, fallbackStdout) => {
           if (fallbackError) {
             reject(new Error('Failed to parse video metadata.'));
           } else {
@@ -201,7 +202,7 @@ app.post('/api/jobs/:id/start', (req, res) => {
     return res.status(400).json({ error: 'Job is already processing.' });
   }
 
-  const { targetFormat, compressionMode, resolutionScale, audioOption, customBitrate, customSavePath } = req.body;
+  const { targetFormat, compressionMode, resolutionScale, audioOption, customBitrate } = req.body;
 
   // Determine output extension
   let outExt = '.mp4';
@@ -214,7 +215,6 @@ app.post('/api/jobs/:id/start', (req, res) => {
 
   job.outputFilename = outputFilename;
   job.outputPath = outputPath;
-  job.customSavePath = customSavePath; // Store custom output path
   job.status = 'processing';
 
   // Build FFmpeg arguments
@@ -342,24 +342,6 @@ app.post('/api/jobs/:id/start', (req, res) => {
         job.status = 'completed';
         job.progress = 100;
         job.compressedSize = stats.size;
-        
-        let copyError = null;
-        if (job.customSavePath) {
-          try {
-            if (fs.existsSync(job.customSavePath)) {
-              const exportFilename = `${path.basename(job.originalName, path.extname(job.originalName))}_compressed${path.extname(job.outputFilename)}`;
-              const finalDestPath = path.join(job.customSavePath, exportFilename);
-              fs.copyFileSync(outputPath, finalDestPath);
-              console.log(`Successfully copied completed file directly to custom path: ${finalDestPath}`);
-            } else {
-              copyError = `Custom directory does not exist: ${job.customSavePath}`;
-              console.warn(copyError);
-            }
-          } catch (copyErr) {
-            copyError = `Failed to copy to custom directory: ${copyErr.message}`;
-            console.error(copyError);
-          }
-        }
 
         sendProgressUpdate(jobId, {
           status: 'completed',
@@ -367,7 +349,7 @@ app.post('/api/jobs/:id/start', (req, res) => {
           originalSize: job.originalSize,
           compressedSize: stats.size,
           downloadUrl: `/api/download/${jobId}`,
-          copyError: copyError
+          copyError: null
         });
       } catch (err) {
         job.status = 'failed';
@@ -562,14 +544,7 @@ app.post('/api/clean', (req, res) => {
   });
 });
 
-// 7. Server Shutdown Endpoint
-app.post('/api/shutdown', (req, res) => {
-  res.json({ success: true, message: 'Server shutting down...' });
-  console.log('Shutdown requested. Closing active connections and shutting down server process...');
-  setTimeout(() => {
-    process.exit(0);
-  }, 1000);
-});
+// 7. Server Shutdown Endpoint - REMOVED DUE TO DOS VULNERABILITY
 
 app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);

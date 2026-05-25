@@ -29,9 +29,6 @@
         <button id="clear-temp-btn" class="btn btn-secondary btn-sm">
           <span>🧹 Clear Temp Cache</span>
         </button>
-        <button id="shutdown-server-btn" class="btn btn-danger btn-sm">
-          <span>🛑 Shutdown Server</span>
-        </button>
       </div>
     </header>
 
@@ -170,13 +167,6 @@
           </div>
         </div>
 
-        <!-- Option Block: Custom Save Location -->
-        <div class="option-group">
-          <label for="custom-save-path">Direct Export Directory (Optional)</label>
-          <div class="input-wrapper">
-            <input type="text" id="custom-save-path" placeholder="e.g. C:\Users\Kashu\Desktop">
-          </div>
-          <span class="file-limits">If specified, the file will be saved directly to this local path on your computer.</span>
         </div>
       </div>
 
@@ -298,16 +288,6 @@
   <footer class="app-footer">
     <p>Powered by Node.js & FFmpeg WebAssembly-free Server Pipeline</p>
   </footer>
-
-  <!-- Shutdown Modal Overlay -->
-  <div id="shutdown-overlay" class="hidden">
-    <div class="shutdown-content">
-      <div class="shutdown-icon">⚡</div>
-      <h2>Server Shut Down</h2>
-      <p>The AeroCompress Node.js backend pipeline has been terminated cleanly.</p>
-      <p class="shutdown-subtext">You can now safely close this browser window or tab.</p>
-    </div>
-  </div>
 
   <script src="app.js"></script>
 </body>
