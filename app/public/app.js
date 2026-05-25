@@ -23,6 +23,7 @@ const customBitrateContainer = document.getElementById('custom-bitrate-container
 const customBitrateInput = document.getElementById('custom-bitrate');
 const videoOptionsRow = document.getElementById('video-options-row');
 const compressionGroup = document.getElementById('compression-group');
+const hwAccel = document.getElementById('hw-accel');
 
 // State indicators
 const radialBar = document.getElementById('radial-bar');
@@ -298,7 +299,8 @@ startBtn.addEventListener('click', async () => {
     compressionMode: compressionMode,
     resolutionScale: resolutionScale.value,
     audioOption: audioOption.value,
-    customBitrate: compressionMode === 'custom' ? parseInt(customBitrate, 10) : null
+    customBitrate: compressionMode === 'custom' ? parseInt(customBitrate, 10) : null,
+    hardwareAcceleration: hwAccel.value
   };
 
   try {

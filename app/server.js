@@ -5,23 +5,15 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
+// Use statically compiled binaries from npm
+const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+const ffprobeInstaller = require('@ffprobe-installer/ffprobe');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// FFmpeg and FFprobe executable paths (Smart Portable Resolver)
-let FFMPEG_PATH = 'ffmpeg';
-let FFPROBE_PATH = 'ffprobe';
-
-const defaultWinFfmpeg = path.resolve('C:\\ffmpeg\\bin\\ffmpeg.exe');
-const defaultWinFfprobe = path.resolve('C:\\ffmpeg\\bin\\ffprobe.exe');
-
-// Check if local binaries exist in C:\ffmpeg\bin (priority for local windows setup)
-if (fs.existsSync(defaultWinFfmpeg)) {
-  FFMPEG_PATH = defaultWinFfmpeg;
-}
-if (fs.existsSync(defaultWinFfprobe)) {
-  FFPROBE_PATH = defaultWinFfprobe;
-}
+let FFMPEG_PATH = ffmpegInstaller.path;
+let FFPROBE_PATH = ffprobeInstaller.path;
 
 console.log(`Resolved FFmpeg binary path: ${FFMPEG_PATH}`);
 console.log(`Resolved FFprobe binary path: ${FFPROBE_PATH}`);
@@ -205,7 +197,7 @@ app.post('/api/jobs/:id/start', (req, res) => {
     return res.status(400).json({ error: 'Job is already processing.' });
   }
 
-  const { targetFormat, compressionMode, resolutionScale, audioOption, customBitrate } = req.body;
+  const { targetFormat, compressionMode, resolutionScale, audioOption, customBitrate, hardwareAcceleration } = req.body;
 
   // Determine output extension
   let outExt = '.mp4';
@@ -220,165 +212,197 @@ app.post('/api/jobs/:id/start', (req, res) => {
   job.outputPath = outputPath;
   job.status = 'processing';
 
-  // Build FFmpeg arguments
-  const args = ['-y', '-i', job.inputPath];
+  const startEncoding = (useHwAccel) => {
+    // Build FFmpeg arguments
+    const args = ['-y', '-i', job.inputPath];
 
-  if (targetFormat === 'mp3') {
-    args.push('-vn', '-acodec', 'libmp3lame');
-    const kbps = compressionMode === 'high' ? '320k' : (compressionMode === 'max' ? '128k' : '192k');
-    args.push('-b:a', kbps);
-  } else {
-    let vcodec = 'libx264';
-    if (targetFormat === 'mkv') {
-      vcodec = 'libx265';
-    } else if (targetFormat === 'webm') {
-      vcodec = 'libvpx-vp9';
-    }
+    let vcodec = null;
 
-    args.push('-vcodec', vcodec);
-
-    if (compressionMode === 'custom' && customBitrate) {
-      args.push('-b:v', `${customBitrate}k`);
-      if (vcodec === 'libx264' || vcodec === 'libx265') {
-        args.push('-maxrate', `${customBitrate * 1.5}k`, '-bufsize', `${customBitrate * 2}k`);
-      }
+    if (targetFormat === 'mp3') {
+      args.push('-vn', '-acodec', 'libmp3lame');
+      const kbps = compressionMode === 'high' ? '320k' : (compressionMode === 'max' ? '128k' : '192k');
+      args.push('-b:a', kbps);
     } else {
-      let crf = 23;
-      if (vcodec === 'libx264') {
-        crf = compressionMode === 'high' ? 18 : (compressionMode === 'max' ? 28 : 23);
-      } else if (vcodec === 'libx265') {
-        crf = compressionMode === 'high' ? 20 : (compressionMode === 'max' ? 32 : 28);
-      } else if (vcodec === 'libvpx-vp9') {
-        crf = compressionMode === 'high' ? 25 : (compressionMode === 'max' ? 40 : 32);
-        args.push('-b:v', '0');
+      vcodec = 'libx264';
+      if (targetFormat === 'mkv') {
+        vcodec = 'libx265';
+      } else if (targetFormat === 'webm') {
+        vcodec = 'libvpx-vp9';
       }
 
-      args.push('-crf', crf.toString());
+      // Apply hardware acceleration if requested and applicable (not mp3/webm usually, but we'll map mp4/mkv)
+      if (useHwAccel && useHwAccel !== 'cpu' && (targetFormat === 'mp4' || targetFormat === 'mkv')) {
+        if (useHwAccel === 'nvenc') {
+          vcodec = targetFormat === 'mkv' ? 'hevc_nvenc' : 'h264_nvenc';
+        } else if (useHwAccel === 'amf') {
+          vcodec = targetFormat === 'mkv' ? 'hevc_amf' : 'h264_amf';
+        } else if (useHwAccel === 'qsv') {
+          vcodec = targetFormat === 'mkv' ? 'hevc_qsv' : 'h264_qsv';
+        }
+      }
+
+      args.push('-vcodec', vcodec);
+
+      if (compressionMode === 'custom' && customBitrate) {
+        args.push('-b:v', `${customBitrate}k`);
+        if (vcodec.includes('264') || vcodec.includes('265') || vcodec.includes('nvenc') || vcodec.includes('amf') || vcodec.includes('qsv')) {
+          args.push('-maxrate', `${customBitrate * 1.5}k`, '-bufsize', `${customBitrate * 2}k`);
+        }
+      } else {
+        let crf = 23;
+        if (vcodec.includes('264') || vcodec.includes('nvenc') || vcodec.includes('amf') || vcodec.includes('qsv')) {
+          crf = compressionMode === 'high' ? 18 : (compressionMode === 'max' ? 28 : 23);
+        } else if (vcodec.includes('265') || vcodec.includes('hevc')) {
+          crf = compressionMode === 'high' ? 20 : (compressionMode === 'max' ? 32 : 28);
+        } else if (vcodec === 'libvpx-vp9') {
+          crf = compressionMode === 'high' ? 25 : (compressionMode === 'max' ? 40 : 32);
+          args.push('-b:v', '0');
+        }
+
+        if (vcodec.includes('nvenc') || vcodec.includes('amf') || vcodec.includes('qsv')) {
+           if (vcodec.includes('nvenc')) {
+             args.push('-cq', crf.toString());
+             args.push('-preset', 'hq');
+           } else {
+             args.push('-crf', crf.toString());
+           }
+        } else {
+          args.push('-crf', crf.toString());
+        }
+      }
+
+      if (vcodec === 'libx264' || vcodec === 'libx265' || vcodec.includes('nvenc') || vcodec.includes('amf') || vcodec.includes('qsv')) {
+        args.push('-pix_fmt', 'yuv420p');
+      }
+
+      if (audioOption === 'mute') {
+        args.push('-an');
+      } else {
+        args.push('-acodec', 'aac');
+      }
+
+      if (resolutionScale && resolutionScale !== 'original') {
+        let maxW = 1920;
+        if (resolutionScale === '720p') maxW = 1280;
+        else if (resolutionScale === '480p') maxW = 854;
+
+        args.push('-vf', `scale='min(${maxW},iw)':-2`);
+      }
     }
 
-    if (vcodec === 'libx264' || vcodec === 'libx265') {
-      args.push('-pix_fmt', 'yuv420p');
-    }
+    args.push(outputPath);
 
-    if (audioOption === 'mute') {
-      args.push('-an');
-    } else {
-      args.push('-acodec', 'aac');
-    }
+    console.log(`[FFmpeg] Starting encoding job ${jobId} using codec: ${vcodec || 'libmp3lame (Audio)'}`);
 
-    if (resolutionScale && resolutionScale !== 'original') {
-      let maxW = 1920;
-      if (resolutionScale === '720p') maxW = 1280;
-      else if (resolutionScale === '480p') maxW = 854;
+    // Spawn FFmpeg process
+    const ffmpegProcess = spawn(FFMPEG_PATH, args);
+    job.process = ffmpegProcess;
 
-      args.push('-vf', `scale='min(${maxW},iw)':-2`);
-    }
-  }
+    const totalDuration = job.metadata.duration || 0;
 
-  args.push(outputPath);
+    ffmpegProcess.stderr.on('data', (data) => {
+      const output = data.toString();
 
-  // Spawn FFmpeg process
-  const ffmpegProcess = spawn(FFMPEG_PATH, args);
-  job.process = ffmpegProcess;
+      // Parse FFmpeg progress patterns
+      const timeMatch = output.match(/time=\s*(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
+      const speedMatch = output.match(/speed=\s*([\d.]+)x/);
+      const fpsMatch = output.match(/fps=\s*([\d.]+)/);
 
-  const totalDuration = job.metadata.duration || 0;
+      if (timeMatch && totalDuration > 0) {
+        const hours = parseInt(timeMatch[1], 10);
+        const minutes = parseInt(timeMatch[2], 10);
+        const seconds = parseInt(timeMatch[3], 10);
+        const centiseconds = parseInt(timeMatch[4], 10);
+        
+        const currentSeconds = (hours * 3600) + (minutes * 60) + seconds + (centiseconds / 100);
+        const progress = Math.min(99, Math.round((currentSeconds / totalDuration) * 100));
+        
+        job.progress = progress;
+        job.speed = speedMatch ? `${speedMatch[1]}x` : job.speed || '1x';
+        job.fps = fpsMatch ? Math.round(parseFloat(fpsMatch[1])) : job.fps || 0;
 
-  ffmpegProcess.stderr.on('data', (data) => {
-    const output = data.toString();
-    
-    // Parse FFmpeg progress patterns
-    // e.g. time=00:00:05.12 speed=1.23x fps=25
-    const timeMatch = output.match(/time=\s*(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
-    const speedMatch = output.match(/speed=\s*([\d.]+)x/);
-    const fpsMatch = output.match(/fps=\s*([\d.]+)/);
+        let eta = 'calculating...';
+        if (speedMatch) {
+          const speedVal = parseFloat(speedMatch[1]);
+          if (speedVal > 0) {
+            const remainingSeconds = (totalDuration - currentSeconds) / speedVal;
+            if (remainingSeconds > 0) {
+              const etaMin = Math.floor(remainingSeconds / 60);
+              const etaSec = Math.floor(remainingSeconds % 60);
+              eta = etaMin > 0 ? `${etaMin}m ${etaSec}s` : `${etaSec}s`;
+            } else {
+              eta = '0s';
+            }
+          }
+        }
+        job.eta = eta;
 
-    if (timeMatch && totalDuration > 0) {
-      const hours = parseInt(timeMatch[1], 10);
-      const minutes = parseInt(timeMatch[2], 10);
-      const seconds = parseInt(timeMatch[3], 10);
-      const centiseconds = parseInt(timeMatch[4], 10);
-      
-      const currentSeconds = (hours * 3600) + (minutes * 60) + seconds + (centiseconds / 100);
-      const progress = Math.min(99, Math.round((currentSeconds / totalDuration) * 100));
-      
-      job.progress = progress;
-      job.speed = speedMatch ? `${speedMatch[1]}x` : job.speed || '1x';
-      job.fps = fpsMatch ? Math.round(parseFloat(fpsMatch[1])) : job.fps || 0;
+        sendProgressUpdate(jobId, {
+          status: 'processing',
+          progress: job.progress,
+          speed: job.speed,
+          fps: job.fps,
+          eta: job.eta
+        });
+      }
+    });
 
-      // Estimate Time Remaining (ETA)
-      let eta = 'calculating...';
-      if (speedMatch) {
-        const speedVal = parseFloat(speedMatch[1]);
-        if (speedVal > 0) {
-          const remainingSeconds = (totalDuration - currentSeconds) / speedVal;
-          if (remainingSeconds > 0) {
-            const etaMin = Math.floor(remainingSeconds / 60);
-            const etaSec = Math.floor(remainingSeconds % 60);
-            eta = etaMin > 0 ? `${etaMin}m ${etaSec}s` : `${etaSec}s`;
-          } else {
-            eta = '0s';
+    ffmpegProcess.on('close', (code) => {
+      job.process = null;
+
+      if (code === 0) {
+        fs.unlink(job.inputPath, () => {});
+        try {
+          const stats = fs.statSync(outputPath);
+          job.status = 'completed';
+          job.progress = 100;
+          job.compressedSize = stats.size;
+
+          sendProgressUpdate(jobId, {
+            status: 'completed',
+            progress: 100,
+            originalSize: job.originalSize,
+            compressedSize: stats.size,
+            downloadUrl: `/api/download/${jobId}`,
+            copyError: null
+          });
+        } catch (err) {
+          job.status = 'failed';
+          job.error = 'Output file could not be read.';
+          sendProgressUpdate(jobId, {
+            status: 'failed',
+            error: job.error
+          });
+        }
+      } else {
+        if (useHwAccel && useHwAccel !== 'cpu' && job.status !== 'cancelled') {
+           console.log(`[FFmpeg] GPU Encoder (${useHwAccel}) failed. Falling back to CPU...`);
+           if (fs.existsSync(outputPath)) {
+             fs.unlinkSync(outputPath);
+           }
+           startEncoding('cpu');
+           return; // Do not terminate SSE clients, wait for fallback to finish
+        } else {
+          fs.unlink(job.inputPath, () => {});
+          if (job.status !== 'cancelled') {
+            job.status = 'failed';
+            job.error = 'FFmpeg encoding process failed.';
+            sendProgressUpdate(jobId, {
+              status: 'failed',
+              error: job.error
+            });
           }
         }
       }
-      job.eta = eta;
 
-      // Broadcast progress
-      sendProgressUpdate(jobId, {
-        status: 'processing',
-        progress: job.progress,
-        speed: job.speed,
-        fps: job.fps,
-        eta: job.eta
-      });
-    }
-  });
-
-  ffmpegProcess.on('close', (code) => {
-    job.process = null;
-    
-    // Clean up original uploaded file to save space immediately!
-    fs.unlink(job.inputPath, () => {});
-
-    if (code === 0) {
-      try {
-        const stats = fs.statSync(outputPath);
-        job.status = 'completed';
-        job.progress = 100;
-        job.compressedSize = stats.size;
-
-        sendProgressUpdate(jobId, {
-          status: 'completed',
-          progress: 100,
-          originalSize: job.originalSize,
-          compressedSize: stats.size,
-          downloadUrl: `/api/download/${jobId}`,
-          copyError: null
-        });
-      } catch (err) {
-        job.status = 'failed';
-        job.error = 'Output file could not be read.';
-        sendProgressUpdate(jobId, {
-          status: 'failed',
-          error: job.error
-        });
+      if (clients[jobId]) {
+        clients[jobId].forEach(res => res.end());
+        delete clients[jobId];
       }
-    } else {
-      if (job.status !== 'cancelled') {
-        job.status = 'failed';
-        job.error = 'FFmpeg encoding process failed.';
-        sendProgressUpdate(jobId, {
-          status: 'failed',
-          error: job.error
-        });
-      }
-    }
+    });
+  };
 
-    // Terminate all SSE client connections for this job
-    if (clients[jobId]) {
-      clients[jobId].forEach(res => res.end());
-      delete clients[jobId];
-    }
-  });
+  startEncoding(hardwareAcceleration);
 
   res.json({ success: true, message: 'Compression started.' });
 });

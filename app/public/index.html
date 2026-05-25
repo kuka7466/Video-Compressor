@@ -167,6 +167,18 @@
           </div>
         </div>
 
+        <!-- Option Block: Hardware Acceleration -->
+        <div class="option-group">
+          <label for="hw-accel">Hardware Acceleration (GPU)</label>
+          <div class="select-wrapper">
+            <select id="hw-accel">
+              <option value="cpu" selected>CPU (Software - Most Compatible)</option>
+              <option value="nvenc">NVIDIA (NVENC)</option>
+              <option value="amf">AMD (AMF)</option>
+              <option value="qsv">Intel (QuickSync)</option>
+            </select>
+          </div>
+          <span class="file-limits">Dramatically speeds up encoding. Will automatically fallback to CPU if the selected GPU is not found on this machine.</span>
         </div>
       </div>
 
