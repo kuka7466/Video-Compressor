@@ -96,10 +96,12 @@ function getVideoMetadata(filePath) {
     const args = ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height,duration,r_frame_rate', '-show_entries', 'format=size,duration,bit_rate', '-of', 'json', filePath];
     execFile(FFPROBE_PATH, args, (error, stdout, stderr) => {
       if (error) {
+        console.error('[FFprobe Error] Primary probe failed:', error.message);
         // Fallback for audio-only or unsupported video structures
         const fallbackArgs = ['-v', 'error', '-show_entries', 'format=size,duration,bit_rate', '-of', 'json', filePath];
         execFile(FFPROBE_PATH, fallbackArgs, (fallbackError, fallbackStdout) => {
           if (fallbackError) {
+            console.error('[FFprobe Error] Fallback probe failed:', fallbackError.message);
             reject(new Error('Failed to parse video metadata.'));
           } else {
             try {
@@ -183,6 +185,7 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('[Upload API Error] Video metadata parsing failed:', error);
     // Cleanup upload on metadata parsing error
     fs.unlink(req.file.path, () => {});
     res.status(500).json({ error: 'Could not inspect video file. Please verify it is a valid video.' });
